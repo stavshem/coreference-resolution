@@ -1,16 +1,12 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from torchtext.vocab import Vectors
-from torch.autograd import Variable
-
 import os, io, re, attr, random
 from fnmatch import fnmatch
 from copy import deepcopy as c
 from boltons.iterutils import pairwise
 from cached_property import cached_property
 
-from utils import *
+from utils import flatten, to_cuda
 
 NORMALIZE_DICT = {"/.": ".", "/?": "?",
                   "-LRB-": "(", "-RRB-": ")",
@@ -162,6 +158,14 @@ class LazyVectors:
             >> embeddings(sent_to_tensor('kids love unknown_word food'))
         You can access these moved vectors from any repository
         """
+
+        # locals() = {
+        #   'cls': <class 'src.loader.LazyVectors'>,
+        #   'corpus_vocabulary': set(),
+        #   'name': 'glove.840B.300d.txt',
+        #   'cache': '/Users/staveshemesh/Projects/coreference-resolution/data/glove/.vector_cache/',
+        #   'skim': None
+        # }
         self.__dict__.update(locals())
         if self.vocab is not None:
             self.set_vocab(vocab)
@@ -178,6 +182,13 @@ class LazyVectors:
         """ Set corpus vocab
         """
         # Intersects and initializes the torchtext Vectors class
+        # self.loader.stoi - collections.defaultdict instance mapping token strings to numerical identifiers.
+        # {
+        #    'the': 0,
+        #    ',': 1,
+        #    'most': 96,
+        #    ....
+        # }
         self.vocab = [v for v in vocab if v in self.loader.stoi][:self.skim]
 
         self.set_dicts()
@@ -322,15 +333,17 @@ def lookup_tensor(tokens, vectorizer):
     return to_cuda(torch.tensor([vectorizer.stoi(t) for t in tokens]))
 
 
-# Load in corpus, lazily load in word vectors.
-train_corpus = read_corpus('../data/train/')
-val_corpus = read_corpus('../data/development/')
-test_corpus = read_corpus('../data/test/')
+# Don't run on module import
+if __name__ == '__main__':
+    # Load in corpus, lazily load in word vectors.
+    train_corpus = read_corpus('../data/train/')
+    val_corpus = read_corpus('../data/development/')
+    test_corpus = read_corpus('../data/test/')
 
-GLOVE = LazyVectors.from_corpus(train_corpus.vocab,
-                                name='glove.840B.300d.txt',
-                                cache='/Users/sob/github/.vector_cache/')
+    GLOVE = LazyVectors.from_corpus(train_corpus.vocab,
+                                    name='glove.840B.300d.txt',
+                                    cache='/Users/sob/github/.vector_cache/')
 
-TURIAN = LazyVectors.from_corpus(train_corpus.vocab,
-                                 name='hlbl-embeddings-scaled.EMBEDDING_SIZE=50',
-                                 cache='/Users/sob/github/.vector_cache/')
+    TURIAN = LazyVectors.from_corpus(train_corpus.vocab,
+                                     name='hlbl-embeddings-scaled.EMBEDDING_SIZE=50',
+                                     cache='/Users/sob/github/.vector_cache/')
