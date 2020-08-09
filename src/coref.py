@@ -1,7 +1,6 @@
 # TODO:
 # Early stopping
 
-print('Initializing...')
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -114,13 +113,15 @@ class CharCNN(nn.Module):
     """ Character-level CNN. Contains character embeddings.
     """
 
-    unk_idx = 1
-    vocab = train_corpus.char_vocab
-    _stoi = {char: idx+2 for idx, char in enumerate(vocab)}
-    pad_size = 15
 
-    def __init__(self, filters, char_dim=8):
+    def __init__(self, filters, train_corpus, char_dim=8):
+
         super().__init__()
+
+        self.unk_idx = 1
+        self.vocab = train_corpus.char_vocab
+        self._stoi = {char: idx + 2 for idx, char in enumerate(self.vocab)}
+        self.pad_size = 15
 
         self.embeddings = nn.Embedding(len(self.vocab)+2, char_dim, padding_idx=0)
         self.convs = nn.ModuleList([nn.Conv1d(in_channels=self.pad_size,
@@ -164,8 +165,11 @@ class CharCNN(nn.Module):
 class DocumentEncoder(nn.Module):
     """ Document encoder for tokens
     """
-    def __init__(self, hidden_dim, char_filters, n_layers=2):
+    def __init__(self, train_corpus, GLOVE, TURIAN, hidden_dim, char_filters, n_layers=2):
         super().__init__()
+
+        self.GLOVE = GLOVE
+        self.TURIAN = TURIAN
 
         # Unit vector embeddings as per Section 7.1 of paper
         glove_weights = F.normalize(GLOVE.weights())
@@ -182,7 +186,7 @@ class DocumentEncoder(nn.Module):
         self.turian.weight.requires_grad = False
 
         # Character
-        self.char_embeddings = CharCNN(char_filters)
+        self.char_embeddings = CharCNN(char_filters, train_corpus)
 
         # Sentence-LSTM
         self.lstm = nn.LSTM(glove_weights.shape[1]+turian_weights.shape[1]+char_filters,
@@ -222,10 +226,10 @@ class DocumentEncoder(nn.Module):
         """ Embed a sentence using GLoVE, Turian, and character embeddings """
 
         # Embed the tokens with Glove
-        glove_embeds = self.glove(lookup_tensor(sent, GLOVE))
+        glove_embeds = self.glove(lookup_tensor(sent, self.GLOVE))
 
         # Embed again using Turian this time
-        tur_embeds = self.turian(lookup_tensor(sent, TURIAN))
+        tur_embeds = self.turian(lookup_tensor(sent, self.TURIAN))
 
         # Character embeddings
         char_embeds = self.char_embeddings(sent)
@@ -684,8 +688,10 @@ class Trainer:
         self.model = to_cuda(self.model)
 
 
-# Initialize model, train
-model = CorefScore(embeds_dim=400, hidden_dim=200)
-# ?? train for 150 epochs, each each train 100 documents
-trainer = Trainer(model, train_corpus, val_corpus, test_corpus, steps=100)
-trainer.train(150)
+if __name__ == '__main__':
+    # Initialize model, train
+    DocumentEncoder(400, 200)
+    # model = CorefScore(embeds_dim=400, hidden_dim=200)
+    # # ?? train for 150 epochs, each each train 100 documents
+    # trainer = Trainer(model, train_corpus, val_corpus, test_corpus, steps=100)
+    # trainer.train(150)
